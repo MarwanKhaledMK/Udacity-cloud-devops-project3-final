@@ -1,0 +1,7 @@
+Github url: https://github.com/MarwanKhaledMK/Udacity-cloud-devops-project3-final
+s3 website endpoint: http://udapeople-c0345c4.s3-website-us-east-1.amazonaws.com
+cloudfront domain name: http://d1in00w14rr06c.cloudfront.net
+backend url status: http://100.26.100.60:3030/api/status
+backend url: http://udapeople-c0345c4.s3-website-us-east-1.amazonaws.com
+
+
