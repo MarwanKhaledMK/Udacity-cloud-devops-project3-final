@@ -10,6 +10,23 @@ awsimage: &awsimage
 
 version: 2.1
 
+commands:
+  destroy-environment:
+    description: Destroy back-end and front-end cloudformation stacks given a workflow ID.
+    parameters: &parameter
+      workflow_id:
+        type: string
+        default: ${CIRCLE_WORKFLOW_ID:0:7}
+    steps:
+      - run:
+          name: Destroy environments
+          when: on_fail
+          command: |
+            echo "Destroying environment: << parameters.workflow_id >> "
+            aws cloudformation delete-stack --stack-name udapeople-backend-<< parameters.workflow_id >>
+            aws cloudformation delete-stack --stack-name udapeople-frontend-<< parameters.workflow_id >>
+
+
 jobs:
   build-frontend:
     <<: *nodeimage
@@ -104,7 +121,68 @@ jobs:
             cd backend
             npm install 
             npm audit fix --audit-level=critical --force
-      
+
+  deploy-infrastructure:
+    <<: *awsimage
+    parameters: *parameter
+    steps:
+      - checkout
+      - run:
+          name: Install tar and gzip. # Workspace attachment needs tar and gzip which is not in awsimage https://www.youtube.com/watch?v=RhkaSfBlqCk 
+          command: |
+            yum install -y tar gzip
+      - run:
+          name: Ensure back-end infrastructure exists
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/backend.yml \
+              --tags project=udapeople \
+              --stack-name "udapeople-backend-<< parameters.workflow_id >>" \
+              --parameter-overrides ID="<< parameters.workflow_id >>"
+      - run:
+          name: Ensure front-end infrastructure exist
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/frontend.yml \
+              --tags project=udapeople \
+              --stack-name "udapeople-frontend-<< parameters.workflow_id >>" \
+              --parameter-overrides ID="<< parameters.workflow_id >>"
+      - run:
+          name: Add back-end ip to ansible inventory
+          command: |
+            aws ec2 describe-instances \
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --filter "Name=tag:project, Values=udapeople" \
+              --output text >> .circleci/ansible/inventory.txt
+
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project/.circleci/ansible/inventory.txt     
+      - destroy-environment
+
+  configure-infrastructure:
+    <<: *pythonalpineimage
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints: ["b4:a0:d4:2d:fe:df:e0:9f:8c:73:86:cf:b1:db:87:19"]
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update ansible
+            pip install awscli
+      - run:
+          name: Configure server
+          no_output_timeout: 15m
+          command: |
+            cd .circleci/ansible
+            cat inventory.txt
+            ansible-playbook configure-server.yml -i inventory.txt
+
+      - destroy-environment    
   
 
 workflows:
@@ -122,3 +200,10 @@ workflows:
           requires: [build-backend]
       - scan-frontend:
           requires: [build-frontend]
+      - deploy-infrastructure:
+          requires: [test-frontend, test-backend, scan-frontend, scan-backend]
+          filters:
+            branches:
+              only: [master]
+      - configure-infrastructure:
+          requires: [deploy-infrastructure]
