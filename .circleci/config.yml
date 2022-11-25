@@ -44,7 +44,6 @@ commands:
             else
               echo "No reversion happening"
             fi
-
   empty-bucket:
     description: on failure empty the created s3 bucket in this workflow
     parameters: *parameter
@@ -55,7 +54,6 @@ commands:
           command: |
             echo "Emptying S3 bucket: s3://udapeople-<< parameters.workflow_id >>"
             aws s3 rm s3://udapeople-<< parameters.workflow_id >> --recursive --quiet
-
 jobs:
   build-frontend:
     <<: *nodeimage
@@ -150,6 +148,7 @@ jobs:
             cd backend
             npm install 
             npm audit fix --audit-level=critical --force
+      
 
   deploy-infrastructure:
     <<: *awsimage
@@ -211,8 +210,8 @@ jobs:
             cat inventory.txt
             ansible-playbook configure-server.yml -i inventory.txt
 
-      - destroy-environment    
-  
+      - destroy-environment
+
   run-migrations:
     <<: *nodeimage
     parameters: *parameter
@@ -244,11 +243,12 @@ jobs:
       - revert-migrations
       - destroy-environment
 
+
 workflows:
   default:
     jobs:
       - build-frontend
-      - build-backend      
+      - build-backend
       - test-frontend:
           requires:
             - build-frontend
